@@ -1,7 +1,7 @@
-function [rgb,model,mosaicType] = nefRead(fname,sampleRate,returnMosaic,model)
-%Decode image data from Nikon .NEF file, return rgb or full mosaic
+function [rgb,mosaicType] = nefRead(fname,sampleRate,returnMosaic)
+%Decode image data from Nikon NEF file, return rgb or full mosaic
 %
-%  [rgb,model,mosaicType] = nefRead(fname,sampleRate,returnMosaic)
+%  [rgb,mosaicType] = nefRead(fname,sampleRate,returnMosaic)
 %
 % NOTE:  The returned data are uint16 as acquired by the camera.
 %
@@ -20,8 +20,6 @@ function [rgb,model,mosaicType] = nefRead(fname,sampleRate,returnMosaic,model)
 %   2 - the data are turned in a 3D RGB image in which the G field is
 %   assigned the average of the two G fields. 
 %
-%  model:  D70 (default) or D100 are currently supported 
-%
 % The fname is normally a full path name. 
 % 
 % Examples:
@@ -34,20 +32,20 @@ function [rgb,model,mosaicType] = nefRead(fname,sampleRate,returnMosaic,model)
 %
 %  mosaic = nefRead(fullName,1,1);
 %
+% 
 %
-% Author: FX, BW
+% FX, BW Copyright Imageval Consulting, LLC
 
 if ieNotDefined('fname'),        
     fname = vcSelectDataFile('stayput','r','nef','select NEF file');
     if isempty(fname), disp('Canceled'); end
 end
-if ieNotDefined('sampleRate'),   sampleRate = 2;   end
+if ieNotDefined('sampleRate'),   sampleRate = 1;   end
 if ieNotDefined('returnMosaic'), returnMosaic = 0; end
-if ieNotDefined('model'),        model = 'D70';    end
 
 % The mighty dcraw is in the nef directory.
-dcrawData= nefDCrawWrapper(fname);
-mosaic   = dcrawData.rawimage;
+dcrawData = nefDCrawWrapper(fname);
+mosaic    = dcrawData.rawimage;
 r = size(mosaic,1); c = size(mosaic,2);
 mosaicType = dcrawData.pattern(1:4);
 
@@ -55,17 +53,16 @@ mosaicType = dcrawData.pattern(1:4);
 % though, we have opened old files with odd sizes.  This should cause an
 % alert.
 if isodd(r)
-    warning('Odd row size'); %#ok<WNTAG>
+    warning('Odd row size set to even by clipping'); %#ok<WNTAG>
     mosaic = mosaic(1:(end-1),:);
 elseif isodd(c)
-    warning('Odd col size'); %#ok<WNTAG>
+    warning('Odd col size  set to even by clipping'); %#ok<WNTAG>
     mosaic = mosaic(:,1:(end-1));
 end
-
-mosaic = mosaic';
+% vcNewGraphWin; imagesc(double(mosaic(1:32,1:32))); colormap(gray)
 
 if returnMosaic == 0
-    % Default:  sends back an RGBG image in four planes
+    % Default:  sends back an image in four planes, R,G,B,G
     rgb = mosaic2DenseRGBG(mosaic,mosaicType,sampleRate);
 elseif (returnMosaic == 1)
     % Return in a single plane RGBG
@@ -80,7 +77,10 @@ elseif returnMosaic == 2
     rgb(:,:,4) = [];   % Clears the fourth plane
 end
 
-return;
+% Are these reasonable RGB images?
+% vcNewGraphWin; imagescRGB(double(rgb(:,:,1:3)).^(1/2.2));
+% vcNewGraphWin; imagescRGB(double(rgb(:,:,[1,4,3])).^(1/2.2));
+end
 
 %-----------------------------
 function rgb = mosaic2DenseRGBG(mosaic,mosaicType,sampleRate)
@@ -95,12 +95,15 @@ function rgb = mosaic2DenseRGBG(mosaic,mosaicType,sampleRate)
 switch lower(mosaicType)
     case 'grbg'
         % D100 case
+        fprintf('Appears to be D100 data\n')
         cPlane = [2 1 3 4]; 
     case 'bggr'
         % D70 case
+        fprintf('Appears to be D70 data\n')
         cPlane = [3 2 4 1];
     case 'rggb'
         % D2Xs
+        fprintf('Appears to be D2X data\n')
         cPlane = [3,2,4,1]; %% xxx confirm -- 06/14/2007 - mp
     otherwise,
         disp('Unknown mosaic type');
@@ -128,4 +131,4 @@ else  % No filtering needed, just copy into the RGBG order
     end
 end
 
-return;
+end

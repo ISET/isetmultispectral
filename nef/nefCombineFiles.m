@@ -1,15 +1,16 @@
-function [camRGB, vcInfo] = nefCombineFiles(fnames,sampleRate,scaleIntensityFlag,imgDir,model)
-% Combine Nikon data (.NEF files) from several image into one variable
+function [camRGB, vcInfo] = nefCombineFiles(fnames,sampleRate,scaleIntensityFlag,imgDir)
+% Combine Nikon data (NEF files) from several images into one variable
 % (camRGB)
 %
-%  [camRGB, vcInfo] = nefCombineFiles([fnames],[sampleRate],[scaleIntensityFlag],[imgDir],[model])
+%  [camRGB, vcInfo] = nefCombineFiles([fnames],[sampleRate], ...
+%                        [scaleIntensityFlag],[imgDir])
 %
-%    The returned camRGB data are in RGB format.  All of the data from all
-%    of the files are combined into the camRGB varible.  Its dimensions are
-%    [row,col,3,length(fnames)].
+% The returned camRGB data are in RGB format.  All of the data from all
+% of the files are combined into the camRGB variable.  Its dimensions are
+% [row,col,3,length(fnames)].
 %
-%    Also, a structure vcInfo is returned.  This structure contains the
-%    NEF file names and the spatial sampling rate information.
+% Also, a structure vcInfo is returned.  This structure contains the
+% NEF file names and the spatial sampling rate information.
 %
 % If fnames is empty, the user select the files from a GUI.
 %
@@ -40,7 +41,7 @@ function [camRGB, vcInfo] = nefCombineFiles(fnames,sampleRate,scaleIntensityFlag
 %% Get the names of several NEF files
 if ieNotDefined('imgDir'),             imgDir = pwd; end
 if ieNotDefined('fnames'),             fnames = ieReadMultipleFileNames(imgDir);  end
-if ieNotDefined('sampleRate'),         sampleRate = 2;  end
+if ieNotDefined('sampleRate'),         sampleRate = 1;  end
 if ieNotDefined('scaleIntensityFlag'), scaleIntensityFlag = 1; end
 
 vcInfo.fnames = fnames;
@@ -59,10 +60,13 @@ for ii=1:length(fnames)
     updatedTitle = sprintf('Combining %.0f NEF files (%s)',nFiles,strrep(n,'_','-'));
     waitbar(ii/nFiles,waitFigure,updatedTitle);
     
-    % read in the Bayer pattern data.  These are returned as an RGBG image.
-    raw = nefRead(fnames{ii},sampleRate,0,'D100');
-    
-    raw(:,:,2) = uint16(  (double(raw(:,:,2)) + double(raw(:,:,4))) / 2 );
+    % The return is an RGBG image
+    [raw, mosaicType] = nefRead(fnames{ii},sampleRate,0);
+    % vcNewGraphWin; imagescRGB(double(raw(:,:,1:3)).^(1/2.2));
+
+    % Average the two green pixels
+    raw(:,:,2) = ...
+        uint16(  (double(raw(:,:,2)) + double(raw(:,:,4))) / 2 );
     
     % We assume that there are three color filters.  If there are not, the
     % code breaks here.  The general code would be
