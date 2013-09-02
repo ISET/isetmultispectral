@@ -52,14 +52,30 @@ if ieNotDefined('mcHDRRGB'), error('multicapture HDR RGB image required.'); end
 % We put the data into XW format
 [mcHDRXW,r,c] = RGB2XWFormat(mcHDRRGB);
 
-% Calculate coefs
-coef = mcHDRXW * pinv(sigBasis'*sensor);
+% % Robust regression
+% % Calculate coefs
+% v = svd(sigBasis'*sensor);
+% tol = v*0.01;
+% coef = mcHDRXW * pinv(sigBasis'*sensor,tol);
+% 
+% % predicted = coef*sigBasis'*sensor;
+% % vcNewGraphWin; plot(predicted(:),mcHDRXW(:),'.')
+% 
+% % Put coefs into RGB format 
+% coef = XW2RGBFormat(coef,r,c);
 
-% predicted = coef*sigBasis'*sensor;
-% vcNewGraphWin; plot(predicted(:),mcHDRXW(:),'.')
+% Ridge regression
+%     MCHDRWX = sensor'*sigBasis*coef (notice flip of XW for WX)
+A = sensor'*sigBasis;
+MCHDRWX = mcHDRXW';
 
-% Put coefs into RGB format 
-coef = XW2RGBFormat(coef,r,c);
+% ||A*coef - MCHDRWX || + ||coef||^2
+% coef = inv(A'*A + eye(size(A,2)))*A'*MCHDRWX;
+% coef = ((A'*A + eye(size(A,2)))*A') \ MCHDRWX;
+coef = (A'*A + eye(size(A,2)))\(A'*MCHDRWX);
+
+%  For sceneFromFile we want to store coef'
+coef = XW2RGBFormat(coef',r,c);
 
 %% To check, put the coef into photon space and then multiply by sensor
 % This should get us the camera data
@@ -71,5 +87,6 @@ coef = XW2RGBFormat(coef,r,c);
 %   spd = imageLinearTransform(coef,sigBasis');
 %   vcNewGraphWin; hist(spd(:),500);
 %   min(spd(:)), max(spd(:))
+%   l = spd(:) < 0; sum(l)/length(l)
 
 end

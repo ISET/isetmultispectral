@@ -27,7 +27,7 @@ end
 wavelength = (400:10:700);
 clear csBasis;
 csBasis.wave = wavelength;
-nBases = 4;
+nBases = 5;  % Good for Feng_Office
 
 % This routine combines the high dynamic range files created by
 % s_mcCombineExposure into a single 
@@ -177,7 +177,7 @@ comment.basisSurfaces = fNames;
 
 % Write out the file with the coefficient and basis information
 [p,n] = fileparts(imgDir);
-fname = sprintf('%s-hdrs',n);
+fname = sprintf('%s-%d-hdrs',n,nBases);
 fname = fullfile(p,fname);  % Create the full path name
 
 % spd = imageLinearTransform(mcCOEF,csBasis.basis');
@@ -187,6 +187,6 @@ fprintf('Saved %s\n',fname)
 
 % Read it back in and look
 scene = sceneFromFile(fname,'multispectral',100);
-vcAddAndSelectObject(scene); sceneWindow
+vcAddAndSelectObject(scene); sceneWindow;
 
 %% End  
