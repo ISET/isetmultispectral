@@ -3,19 +3,22 @@ function hdr = mcCombineExposures(images,exposures,saturation,motionFlag)
 %
 %  hdr = mcCombineExposures(images,exposures,saturation,motionFlag)
 %
-% Author:  FX, BW   
-%
 %  Input: 
 %      images --     3D matrix (r, c, exposure)
 %      exposures --  exposure duration for each frame 
 %      saturation -- saturation threshold
 %      motionFlag -- motion detection (1,0) (not implemented yet)
 %
+%
+% FX/BW Imageval Consulting LLC, 2005
+%% 
+
 % TODO:  Brainard and Zhang have a published algorithm for handling
 % saturation cases that we should try to implement here (or elsewhere) in
 % the ISET calculations. 
 
-if ~isa(images,'uint16') & ~isa(images,'int16')
+%%
+if ~isa(images,'uint16') && ~isa(images,'int16')
     scale = double(max(images(:)))/(2^16-1);
     images = uint16(double(images)/scale);
 else 
@@ -29,6 +32,7 @@ if ieNotDefined('saturation')
     saturation = 2^bits*0.75;
 end
 
+%%
 ss = size(images);
 
 if ss(end) ~= length(exposures)
@@ -39,9 +43,8 @@ images = reshape(images,prod(ss)/ss(end),ss(end));
 
 % mexCreateHDRI assumes exposure values in ascending order, so we have to
 % reshuffle them if necessary
-
 [exposures, index] = sort(exposures);
-dd = index-[1:length(index)];
+dd = index(:) - (1:length(index))';
 if sum(abs(dd))~=0
     tmp = images;
     for i=1:length(index) 
@@ -49,8 +52,10 @@ if sum(abs(dd))~=0
     end
 end
 
+exposures = exposures(:)';   % Must be a row vector
 hdr = mexCreateHDRI(images,exposures,saturation); 
+
 hdr = reshape(hdr,ss(1:end-1));
 hdr = hdr*scale;
 
-return;
+end

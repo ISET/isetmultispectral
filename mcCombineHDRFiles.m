@@ -14,17 +14,20 @@ function [mcHDRImage,comments] = mcCombineHDRFiles(fullnames)
 %   [mcHDRImage,comments] = mcCombineHDRFiles;
 %
 
+%%
 if ieNotDefined('fullnames'), fullnames =  ieReadMultipleFileNames;  end
 
-% Initiate mcHDRImage with the first image
+%% Initiate mcHDRImage with the first image
 load(fullnames{1},'hdrImage','comment');
+comments = cell(length(fullnames),1);
+
 comments{1} = comment;
 r = size(hdrImage,1);
 c = size(hdrImage,2);
 mcHDRImage = zeros(r,c,3*length(fullnames));
 mcHDRImage(:,:,1:3) = hdrImage;
 
-% Concatenate the remaining images
+%% Concatenate the remaining images
 for ii=2:length(fullnames)
     load(fullnames{ii},'hdrImage','comment');
     comments{ii} = comment;
@@ -32,4 +35,5 @@ for ii=2:length(fullnames)
     mcHDRImage(:,:,cPlanes) = hdrImage;
 end
 
-return;
+end
+
