@@ -23,6 +23,19 @@
 % nefDir = fullfile(mcRootPath,'data','images','Feng_Office','nefData');
 % chdir(nefDir)
 
-CombineExposure
-CombineColor
+% Combines multiple exposure durations for each of the color filters
+s_mcCombineExposure;
+
+%%
+%
+ii = 1;
+hdrFiles{ii}
+load(hdrFiles{ii});
+vcNewGraphWin; imagescRGB(hdrImage.^(1/4));
+
+
+%
+
+% Combines the color filters into a single multispectral file
+s_mcCombineColor
 
