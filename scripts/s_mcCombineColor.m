@@ -12,22 +12,14 @@
 %
 % BW/JEF Copyright Imageval LLC 2005
 
-%% Check to see if we have the variable hdrFiles
-if ~exist('hdrFiles','var') 
-    warndlg('No hdrFiles listed.  User will be queried.');
-    hdrFiles = [];
-end
+%% Read in the exposure meta data and set nFilters
 
-if ~exist('nFilters','var')
-    warndlg('This script requires the variable nFilters.  Enter the value at the Matlab prompt.');
-    nFilters = input('Number of color filters:  ');
-end
+load(eMetaData)
+hdrFiles
+nFilters = length(filterNames);
 
 %% We have hdrFiles, so we combine them
 wavelength = (400:10:700);
-clear csBasis;
-csBasis.wave = wavelength;
-nBases = 5;  % Good for Feng_Office
 
 % This routine combines the high dynamic range files created by
 % s_mcCombineExposure into a single 
@@ -65,64 +57,40 @@ end
 % plot(wavelength,sensor(:,7:9))
 % plot(wavelength,sensor)
 
-%%  Read in the illuminant and build the basis functions for the color signals.
+%%  Read the illuminant and build indoor color signals basis functions  
 imgDir      = fileparts(hdrFiles{1});
 illName     = fullfile(imgDir,'illuminant');
 load(illName,'illuminant');
-illuminantPhotons = illuminantGet(illuminant,'photons');
-ilWave            = illuminantGet(illuminant,'wave');
-illuminantPhotons = interp1(ilWave,illuminantPhotons,wavelength);
-% vcNewGraphWin; plot(wavelength,illuminantPhotons)
 
-% Create a constant basis and a ramp basis
-csBasis.basis(:,[1,2]) = lmDCBasis(csBasis.wave,1);
+ilWave = illuminantGet(illuminant,'wave');
+inIllP   = illuminantGet(illuminant,'photons');
+inIllP   = interp1(ilWave,inIllP,wavelength);
+% vcNewGraphWin; plot(wavelength,illP)
 
-fNames = {'Clothes_Vhrel','Food_Vhrel','Hair_Vhrel', ...
-'Objects_Vhrel','Nature_Vhrel','DupontPaintChip_Vhrel','macbethChart'};
-% fNames = {'macbethChart'};
-surfaces = lmLookupSignals(fNames, csBasis.wave,0);
-
-% Build the color signal basis functions by multiplying surface
-% basis functions (in this case, derived from surfaceList above)
-% with the illuminant basis.  They don't really have units.
-csBasis.basis(:,(3:nBases)) = lmColorSignalBasis(illuminantPhotons(:),surfaces,nBases-2);
-
-% vcNewGraphWin; 
-% plot(csBasis.wave,csBasis.basis,'-'); xlabel('Wavelength(nm)');
+inBasis = mcBasisCreate(inIllP,nBases,wavelength);
+% vcNewGraphWin; plot(inBasis.wave,inBasis.basis)
 
 %% Calculate multicapture basis coefficients for radiance
 
-% Here, we convert the HDR image into a set of coefficients with respect to
-% the HDR image data and the color signal basis functions in photons.
-mcCOEF    = mcCamera2CSBasis(sensor, csBasis.basis, mcHDRImage);
+% Convert the HDR image data to coefficients with respect to the color
+% signal basis functions (in photons)
+[mcCOEF,err]    = mcCamera2CSBasis(sensor, inBasis.basis, mcHDRImage);
+% vcNewGraphWin; imagesc(err); title('Fluorescent basis fit to data')
 
-% predicted = imageLinearTransform(mcCOEF,csBasis.basis'*sensor);
+% predicted = imageLinearTransform(mcCOEF,inBasis.basis'*sensor);
 % vcNewGraphWin; plot(mcHDRImage(:),predicted(:),'.'); grid on; axis equal
 
 % We should check that the spd estimates are positive!
-%  spd = imageLinearTransform(mcCOEF,csBasis.basis');
+%  spd = imageLinearTransform(mcCOEF,inBasis.basis');
 %  vcNewGraphWin; imageSPD(spd,wavelength,1/3);
-%  vcNewGraphWin; plot(csBasis.wave,csBasis.basis);
+%  vcNewGraphWin; plot(inBasis.wave,inBasis.basis);
 %  vcNewGraphWin; hist(spd(:),500); l = spd(:) < 0; sum(l)/length(l)
 
-%% Separate out bright part and dark part, build different basis
-
-% % Here are the unscaled photons
-% tmp = imageLinearTransform(mcCOEF,csBasis.basis');
-% for ii=1:length(wavelength)
-%     tmp(:,:,ii) = tmp(:,:,ii)/illuminantPhotons(ii);
-% end
-% 
-% % Scale the coefficients so that the estimated reflectance will have a 97th
-% % percentile of 0.9 .
-% r = prctile(tmp(:),97);
-% mcCOEF = 0.9*(mcCOEF/r);
-
-%% Create a comment for the file.
+%% Create a comment and save the file.
 clear comment;
 comment.filters = filterNames;
 comment.sensors = sensorDescription;
-comment.nBases = size(csBasis.basis,2);
+comment.nBases = size(inBasis.basis,2);
 comment.basisSurfaces = fNames;
 
 % Write out the file with the coefficient and basis information
@@ -132,7 +100,7 @@ fname = fullfile(p,fname);  % Create the full path name
 
 % spd = imageLinearTransform(mcCOEF,csBasis.basis');
 % vcNewGraphWin; imageSPD(spd,wavelength);
-ieSaveMultiSpectralImage(fname,mcCOEF,csBasis,comment,[],illuminant);
+ieSaveMultiSpectralImage(fname,mcCOEF,inBasis,comment,[],illuminant);
 fprintf('Saved %s\n',fname)
 
 % Read it back in and look
@@ -141,46 +109,107 @@ vcAddAndSelectObject(scene); sceneWindow;
 
 %% Figure out the high luminance portion
 lum = sceneGet(scene,'luminance');
-vcNewGraphWin; mesh(lum)
-vcNewGraphWin; imagesc(lum)
-mask = (lum > 100);  % Window points
-imagesc(mask)
-colormap(gray)
+% vcNewGraphWin; mesh(lum)
+% vcNewGraphWin; imagesc(lum)
 
+% For window scenes use 100 cd/m2 and for outdoor shadow use 20 cd/m2
+inBright = (lum > 100);  % Window points
+g = fspecial('gaussian',21,7); % g = g/max(g(:));
+inBright = conv2(double(inBright),g,'same');
+c = 0.5;
+inBright(inBright > c)  = 1;
+inBright(inBright <= c) = 0;
+inBright = logical(inBright);
+% vcNewGraphWin; imagesc(inWindow); colormap(gray)
 
 %% Suppose the basis functions in this section of the window are
 % Build the basis functions for the color signals.
+
 illuminant = illuminantCreate('d65');
-illuminantPhotons = illuminantGet(illuminant,'photons');
-ilWave            = illuminantGet(illuminant,'wave');
-illuminantPhotons = interp1(ilWave,illuminantPhotons,wavelength);
-% vcNewGraphWin; plot(wavelength,illuminantPhotons)
+ilWave = illuminantGet(illuminant,'wave');
+dayIllP   = illuminantGet(illuminant,'photons');
+dayIllP   = interp1(ilWave,dayIllP,wavelength);
+% vcNewGraphWin; plot(wavelength,illP)
 
-% Create a constant basis and a ramp basis
-csBasis.basis(:,[1,2]) = lmDCBasis(csBasis.wave,1);
-
-fNames = {'Clothes_Vhrel','Food_Vhrel','Hair_Vhrel', ...
-'Objects_Vhrel','Nature_Vhrel','DupontPaintChip_Vhrel','macbethChart'};
-% fNames = {'macbethChart'};
-surfaces = lmLookupSignals(fNames, csBasis.wave,0);
-
-% Build the color signal basis functions by multiplying surface
-% basis functions (in this case, derived from surfaceList above)
-% with the illuminant basis.  They don't really have units.
-csBasis.basis(:,(3:nBases)) = lmColorSignalBasis(illuminantPhotons(:),surfaces,nBases-2);
-
-%  vcNewGraphWin; plot(csBasis.wave,csBasis.basis);
+dayBasis = mcBasisCreate(dayIllP,nBases,wavelength);
+%  vcNewGraphWin; plot(dayBasis.wave,dayBasis.basis);
 
 
 %% Now fit the whole data set with D65
-mcCOEFDaylight    = mcCamera2CSBasis(sensor, csBasis.basis, mcHDRImage);
+[mcCOEFDaylight,errDay]    = mcCamera2CSBasis(sensor, dayBasis.basis, mcHDRImage);
+% vcNewGraphWin; imagesc(errDay); title('D65 basis fit to data')
 
-% Create a spatial-spectral illuminant that matches the image size
-ilSS = illuminantSS(illuminant,r,c);
+%% Build one integrated coefficient and basis structure
+[mcCOEF,r,c]   = RGB2XWFormat(mcCOEF);
+mcCOEFDaylight = RGB2XWFormat(mcCOEFDaylight);
 
-% How will we use the second set of basis functions?  We could append and
-% have 10 basis functions and make mcCOEF(r,c,A Lot)
+% Zero out the coefficients not relevant to each part of coefficients
+% mask is the part in the window
+mcCOEF(inBright,:) = 0;          % Room points get 0 in window area
+mcCOEFDaylight(~inBright,:) = 0; % Window points get 0 in room area
+
+% Figure out illuminant levels
+% We scale the illuminant levels so that the highest reflectance is 0.9.
+% Calculate photons, divide by illuminant, to get reflectance
+% Then scale so that max reflectance is 0.9.
+ref = (mcCOEF*inBasis.basis')*diag(1./inIllP(:));
+s = prctile(ref(:),92);
+inIllP = (s)*inIllP;
+
+ref = (mcCOEFDaylight*dayBasis.basis')*diag(1./dayIllP(:));
+s = prctile(ref(:),99);
+dayIllP = (s)*dayIllP;
+
+coef = [mcCOEF, mcCOEFDaylight];
+coef = XW2RGBFormat(coef,r,c);
+
+%% Merge bases
+clear basis
+basis.wave = wavelength;
+basis.basis = [inBasis.basis,dayBasis.basis];
+
+%% Set mean luminance to about 50 cd/m2.  Adjust both coefs and lights.
+p = RGB2XWFormat(coef)*basis.basis';
+p = mean(p,1);
+mLum = ieLuminanceFromPhotons(p,wavelength);
+s = 100/mLum;
+coef = coef*s;
+dayIllP = dayIllP*s;
+inIllP  = inIllP*s;
+
+%% Make the space varying illuminant
+illP = zeros(r*c,length(wavelength));
+inBright = RGB2XWFormat(inBright);
+
+% Assign to the illuminant (spatial), point by oint
+illP(inBright,:)   = repmat(dayIllP(:)',sum(inBright),1);
+illP(~inBright,:)  = repmat(inIllP(:)',sum(~inBright),1);
+illP = XW2RGBFormat(illP,r,c);
+% vcNewGraphWin; imageSPD(illP,wavelength,1/3);
+
+il = illuminantCreate;
+il = illuminantSet(il,'wave',wavelength);
+il = illuminantSet(il,'photons',illP);
 
 
+%% Save the merged data
+clear comment;
+comment.filters = filterNames;
+comment.sensors = sensorDescription;
+comment.nBases = size(basis.basis,2);
+
+% Write out the file with the coefficient and basis information
+[p,n] = fileparts(imgDir);
+fname = sprintf('Merged-%s-%d-hdrs',n,nBases);
+fname = fullfile(p,fname);  % Create the full path name
+
+% spd = imageLin100earTransform(mcCOEF,csBasis.basis');
+% vcNewGraphWin; imageSPD(spd,wavelength);
+ieSaveMultiSpectralImage(fname,coef,basis,comment,[],il);
+fprintf('Saved %s\n',fname)
+
+% Read it back in and look
+scene = sceneFromFile(fname,'multispectral',100);
+vcAddAndSelectObject(scene); sceneWindow;
 
 %% End  

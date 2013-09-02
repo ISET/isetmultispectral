@@ -13,7 +13,6 @@
 %
 % Several different exposure durations are read.  These will be saved as
 % one HDR image for each color filter.
-%
 
 sampleRate = 2;           % Subsample and blur a little
 scaleIntensityFlag = 0;
@@ -87,12 +86,8 @@ for ii = 1:nFilters
     
 end
 
-%% At this point we have saved out the HDR for each colored filter
-% To load one you can run
-%
-% ii = 1
-% load(hdrFiles{ii});
-% vcNewGraphWin; imagescRGB(hdrImage.^(1/4));
+eMetaData = fullfile(imgDir,'eMetaData');
+save(eMetaData,'hdrFiles','filterNames');
 
 %% End
 
