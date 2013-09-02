@@ -33,9 +33,6 @@ hdrFiles{ii}
 load(hdrFiles{ii});
 vcNewGraphWin; imagescRGB(hdrImage.^(1/4));
 
-
-%
-
 % Combines the color filters into a single multispectral file
 s_mcCombineColor
 

@@ -31,6 +31,7 @@ end
 
 % Fancy filter names, used for saving combined exposure files
 filterNames = {'No Filter','Tiffen Red 29','Tiffen Deep yellow 15'};
+nFilters = length(filterNames);
 
 %  Extensions put in the file names for the data acquired with each of the
 %  filters.  Used for finding the .NEF files.

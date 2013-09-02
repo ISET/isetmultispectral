@@ -65,97 +65,47 @@ end
 % plot(wavelength,sensor(:,7:9))
 % plot(wavelength,sensor)
 
-
-%% Build the basis functions for the color signals.
-basisType = 'knownlight';
-
-switch basisType
-    case 'rollYourOwn'
-
-        % Select the lights and surfaces for your own basis set.       
-        % lightList = {'A','B','C','D50','D55','D65','D75','FL11','FL2','FL7',...
-        %         'SimonFraserIlluminants','OfficeFL','Vivitar'};
-        lightList = {'A','B','C','D50','D55','D65','D75'};
-        basisLights = lmLookupSignals(lightList, 'illuminants', wavelength,1);
-        % vcNewGraphWin; plot(wavelength, basisLights)
-        
-        fNames = {'Clothes','Food','Hair','Objects','Nature','Paint','macbethChart'};
-        % This one has a NaN in it.  surfaceList = {'SkinReflectance'}
-        surfaces = lmLookupSignals(fNames, 'surfaces', wavelength,0);
-
-        % Build four basis representation
-        csBasis.basis = lmColorSignalBasis(basisLights,surfaces,nBases);
-        % plot(csBasis.wave,csBasis.basis,'-')
-        
-    case 'Gaussian'
-        % Build Gaussian basis functions instead of computing them as above 
-        csBasis.basis(:,[1,2]) = lmDCBasis(csBasis.wave,1);
-        csBasis.basis(:,(3:nBases)) = ...
-            lmGaussianBasis( (nBases - 2), [], [], csBasis.wave);
-        
-        lightList   = 'Gaussian basis functions.';
-        fNames = 'Gaussian basis functions.';
-        
-    case 'knownlight'
-        % Read scene illuminant information
-        % Set scene illuminant as one of the light basis functions
-        
-        % Create a constant basis and a ramp basis
-        csBasis.basis(:,[1,2]) = lmDCBasis(csBasis.wave,1);
-        
-        % Read the illuminant file - make sure that the illuminant file is
-        % called "illuminant"
-        imgDir      = fileparts(hdrFiles{1});
-        illName     = fullfile(imgDir,'illuminant');
-        load(illName,'illuminant');
-        illuminantPhotons = illuminantGet(illuminant,'photons');
-        ilWave      = illuminantGet(illuminant,'wave');
-        illuminantPhotons = interp1(ilWave,illuminantPhotons,wavelength);
-        % vcNewGraphWin; plot(wavelength,illuminantPhotons)
-        
-        % fNames = {'Clothes_Vhrel','Food_Vhrel','Hair_Vhrel', ...
-        %   'Objects_Vhrel','Nature_Vhrel','DupontPaintChip_Vhrel','macbethChart'};
-        fNames = {'macbethChart'};
-        surfaces = lmLookupSignals(fNames, csBasis.wave,0);
-        
-        % Build the color signal basis functions. These basis functions are
-        % created by multiplying surface basis functions (in this case,
-        % derived from Macbeth ColorChecker - see surfaceList above) with
-        % the illuminant basis.  They don't really have units.
-        csBasis.basis(:,(3:nBases)) = lmColorSignalBasis(illuminantPhotons(:),surfaces,nBases-2);
-
-    otherwise
-        error('Unknown method of computing bases')
-end
-
-% vcNewGraphWin; 
-% plot(csBasis.wave,csBasis.basis,'-'); xlabel('Wavelength(nm)');
-
-
-%% Calculate multicapture basis coefficients for radiance
-
-% Here, we convert the HDR image into a set of coefficients with respect to
-% the HDR image data and the color signal basis functions in photons.
-mcCOEF    = mcCamera2CSBasis(sensor, csBasis.basis, mcHDRImage);
-% predicted = imageLinearTransform(mcCOEF,csBasis.basis'*sensor);
-% vcNewGraphWin; plot(mcHDRImage(:),predicted(:),'.'); grid on; axis equal
-% 
-%
-% We should check that the spd estimates are positive!
-%  spd = imageLinearTransform(mcCOEF,csBasis.basis');
-%  vcNewGraphWin; imageSPD(spd,wavelength,1/3);
-%  vcNewGraphWin; plot(csBasis.wave,csBasis.basis);
-%  vcNewGraphWin; hist(spd(:),500); l = spd(:) < 0; sum(l)/length(l)
-
-% Already done in knownlights case.  But might not be done in general.
+%%  Read in the illuminant and build the basis functions for the color signals.
 imgDir      = fileparts(hdrFiles{1});
 illName     = fullfile(imgDir,'illuminant');
 load(illName,'illuminant');
 illuminantPhotons = illuminantGet(illuminant,'photons');
 ilWave            = illuminantGet(illuminant,'wave');
 illuminantPhotons = interp1(ilWave,illuminantPhotons,wavelength);
+% vcNewGraphWin; plot(wavelength,illuminantPhotons)
 
-%% Make tmp an estimate of the reflectances by dividing the illuminant out
+% Create a constant basis and a ramp basis
+csBasis.basis(:,[1,2]) = lmDCBasis(csBasis.wave,1);
+
+fNames = {'Clothes_Vhrel','Food_Vhrel','Hair_Vhrel', ...
+'Objects_Vhrel','Nature_Vhrel','DupontPaintChip_Vhrel','macbethChart'};
+% fNames = {'macbethChart'};
+surfaces = lmLookupSignals(fNames, csBasis.wave,0);
+
+% Build the color signal basis functions by multiplying surface
+% basis functions (in this case, derived from surfaceList above)
+% with the illuminant basis.  They don't really have units.
+csBasis.basis(:,(3:nBases)) = lmColorSignalBasis(illuminantPhotons(:),surfaces,nBases-2);
+
+% vcNewGraphWin; 
+% plot(csBasis.wave,csBasis.basis,'-'); xlabel('Wavelength(nm)');
+
+%% Calculate multicapture basis coefficients for radiance
+
+% Here, we convert the HDR image into a set of coefficients with respect to
+% the HDR image data and the color signal basis functions in photons.
+mcCOEF    = mcCamera2CSBasis(sensor, csBasis.basis, mcHDRImage);
+
+% predicted = imageLinearTransform(mcCOEF,csBasis.basis'*sensor);
+% vcNewGraphWin; plot(mcHDRImage(:),predicted(:),'.'); grid on; axis equal
+
+% We should check that the spd estimates are positive!
+%  spd = imageLinearTransform(mcCOEF,csBasis.basis');
+%  vcNewGraphWin; imageSPD(spd,wavelength,1/3);
+%  vcNewGraphWin; plot(csBasis.wave,csBasis.basis);
+%  vcNewGraphWin; hist(spd(:),500); l = spd(:) < 0; sum(l)/length(l)
+
+%% Separate out bright part and dark part, build different basis
 
 % % Here are the unscaled photons
 % tmp = imageLinearTransform(mcCOEF,csBasis.basis');
@@ -188,5 +138,49 @@ fprintf('Saved %s\n',fname)
 % Read it back in and look
 scene = sceneFromFile(fname,'multispectral',100);
 vcAddAndSelectObject(scene); sceneWindow;
+
+%% Figure out the high luminance portion
+lum = sceneGet(scene,'luminance');
+vcNewGraphWin; mesh(lum)
+vcNewGraphWin; imagesc(lum)
+mask = (lum > 100);  % Window points
+imagesc(mask)
+colormap(gray)
+
+
+%% Suppose the basis functions in this section of the window are
+% Build the basis functions for the color signals.
+illuminant = illuminantCreate('d65');
+illuminantPhotons = illuminantGet(illuminant,'photons');
+ilWave            = illuminantGet(illuminant,'wave');
+illuminantPhotons = interp1(ilWave,illuminantPhotons,wavelength);
+% vcNewGraphWin; plot(wavelength,illuminantPhotons)
+
+% Create a constant basis and a ramp basis
+csBasis.basis(:,[1,2]) = lmDCBasis(csBasis.wave,1);
+
+fNames = {'Clothes_Vhrel','Food_Vhrel','Hair_Vhrel', ...
+'Objects_Vhrel','Nature_Vhrel','DupontPaintChip_Vhrel','macbethChart'};
+% fNames = {'macbethChart'};
+surfaces = lmLookupSignals(fNames, csBasis.wave,0);
+
+% Build the color signal basis functions by multiplying surface
+% basis functions (in this case, derived from surfaceList above)
+% with the illuminant basis.  They don't really have units.
+csBasis.basis(:,(3:nBases)) = lmColorSignalBasis(illuminantPhotons(:),surfaces,nBases-2);
+
+%  vcNewGraphWin; plot(csBasis.wave,csBasis.basis);
+
+
+%% Now fit the whole data set with D65
+mcCOEFDaylight    = mcCamera2CSBasis(sensor, csBasis.basis, mcHDRImage);
+
+% Create a spatial-spectral illuminant that matches the image size
+ilSS = illuminantSS(illuminant,r,c);
+
+% How will we use the second set of basis functions?  We could append and
+% have 10 basis functions and make mcCOEF(r,c,A Lot)
+
+
 
 %% End  

@@ -1,7 +1,7 @@
-function coef  = mcCamera2CSBasis(sensor, sigBasis, mcHDRRGB)
+function coef  = mcCamera2CSBasis(sensor, sigBasis, mcHDRRGB, lambda)
 % Compute the coefficients so that coef*sigBasis' approximates the photons.
 %
-%   coef = mcCamera2CSBasis(sensor, sigBasis, mcHDRRGB)
+%   coef = mcCamera2CSBasis(sensor, sigBasis, mcHDRRGB, lambda)
 %
 % sensor:   Sensor spectral response in columns
 % sigBasis: Signal basis functions
@@ -41,6 +41,7 @@ function coef  = mcCamera2CSBasis(sensor, sigBasis, mcHDRRGB)
 if ieNotDefined('sensor'), error('Sensor sensitivities required.'); end
 if ieNotDefined('sigBasis'), error('Color signal basis required'); end
 if ieNotDefined('mcHDRRGB'), error('multicapture HDR RGB image required.'); end
+if ieNotDefined('lambda'), lambda = 1; end
 
 %% Convert the HDR image to XW format and apply the matrix
 
@@ -52,7 +53,10 @@ if ieNotDefined('mcHDRRGB'), error('multicapture HDR RGB image required.'); end
 % We put the data into XW format
 [mcHDRXW,r,c] = RGB2XWFormat(mcHDRRGB);
 
-% % Robust regression
+% % Robust regression - used to do it this way.  But it seems like the
+% ridge is doing better for us.  Some day, I will have to figure out how to
+% set the lambda
+%
 % % Calculate coefs
 % v = svd(sigBasis'*sensor);
 % tol = v*0.01;
@@ -72,7 +76,7 @@ MCHDRWX = mcHDRXW';
 % ||A*coef - MCHDRWX || + ||coef||^2
 % coef = inv(A'*A + eye(size(A,2)))*A'*MCHDRWX;
 % coef = ((A'*A + eye(size(A,2)))*A') \ MCHDRWX;
-coef = (A'*A + eye(size(A,2)))\(A'*MCHDRWX);
+coef = (A'*A + lambda*eye(size(A,2)))\(A'*MCHDRWX);
 
 %  For sceneFromFile we want to store coef'
 coef = XW2RGBFormat(coef',r,c);
