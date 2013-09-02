@@ -1,4 +1,5 @@
 function [csBasis,cSignals,sValues] = lmColorSignalBasis(lights,surfaces,nBases)
+%Calculate the color signal basis
 %
 %  [csBasis,cSignals,sValues] = lmColorSignalBasis(lights,surfaces,nBases)
 %
@@ -10,7 +11,7 @@ function [csBasis,cSignals,sValues] = lmColorSignalBasis(lights,surfaces,nBases)
 %  surfaces = lmLookupSignals(surfaceList, 'surfaces', wavelength);
 %  [csBasis,cs,sValues] = lmColorSignalBasis(lights,surfaces,nBases)
 %
-%
+% BW Copyright Imageval Consulting LLC 2005
 
 nLights = size(lights,2);
 nWave   = size(lights,1);
