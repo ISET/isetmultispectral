@@ -1,4 +1,4 @@
 multispectral
 =============
 
-Processing multispectral data in various ways
+Reading and processing multispectral data for special applications.  Connected to ISETCAM data formats.
